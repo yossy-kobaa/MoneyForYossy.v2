@@ -1,65 +1,55 @@
-import Image from "next/image";
+import DashboardClient from '@/components/DashboardClient';
+import { getTransactions } from '@/actions/transactionActions';
 
-export default function Home() {
+const BUDGET = 200000;
+
+export const revalidate = 0; // 常に最新データを取得する
+
+export default async function Home() {
+  const transactions = await getTransactions();
+  
+  const initialExpenses = {
+    living: 0,
+    investment: 0,
+    luxury: 0,
+  };
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+
+  for (const t of transactions) {
+    if (!t.date) continue;
+    
+    // スプレッドシートの日付フォーマット（YYYY-MM-DD または YYYY/MM/DD）に対応
+    const parts = t.date.split(/[-/]/);
+    if (parts.length >= 2) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10);
+      
+      // 今月のデータのみ合算する
+      if (year === currentYear && month === currentMonth) {
+        if (t.category === '生活費') initialExpenses.living += t.amount;
+        else if (t.category === '投資') initialExpenses.investment += t.amount;
+        else if (t.category === '贅沢費') initialExpenses.luxury += t.amount;
+        else {
+          // 未分類や空白のものはとりあえず生活費に加算
+          initialExpenses.living += t.amount; 
+        }
+      }
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main className="min-h-screen bg-gray-50/50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 font-sans selection:bg-blue-100 dark:selection:bg-blue-900/50">
+      <div className="max-w-md mx-auto min-h-screen flex flex-col relative pb-12">
+        {/* Decorative Background Blur */}
+        <div className="absolute top-0 inset-x-0 h-[400px] bg-gradient-to-b from-blue-100/50 via-emerald-50/30 to-transparent dark:from-blue-900/20 dark:via-emerald-900/10 -z-10 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-emerald-200/40 dark:bg-emerald-800/20 rounded-full blur-[80px] -z-10 pointer-events-none translate-x-1/3 -translate-y-1/3" />
+        <div className="absolute top-20 left-0 w-[250px] h-[250px] bg-blue-200/40 dark:bg-blue-800/20 rounded-full blur-[80px] -z-10 pointer-events-none -translate-x-1/3" />
+
+        <DashboardClient budget={BUDGET} initialExpenses={initialExpenses} />
+      </div>
+    </main>
   );
 }
