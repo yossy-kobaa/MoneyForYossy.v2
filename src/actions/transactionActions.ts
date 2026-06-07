@@ -1,6 +1,7 @@
 "use server";
 
 import { getGoogleSheetDocument } from '../lib/googleSheets';
+import { checkAndSyncPreviousMonth, syncIfPastMonth } from './summaryActions';
 
 export type Transaction = {
   id: string;
@@ -19,6 +20,11 @@ const TRANSACTIONS_SHEET_TITLE = 'Transactions';
  */
 export async function getTransactions(): Promise<Transaction[]> {
   try {
+    // 非同期または同期で先月分の集計チェックを実行
+    // （初回ロード時の遅延を防ぐためPromiseを待たずにバックグラウンド実行も可能だが、
+    // ここでは安全のためawaitする。既に集計済みの場合は高速に終わる）
+    await checkAndSyncPreviousMonth();
+
     const doc = await getGoogleSheetDocument();
     
     // シートが見つからない場合は最初のシート（インデックス0）をフォールバックとして使用する
@@ -64,6 +70,9 @@ export async function addTransaction(
       'メモ': data.memo || '',
     });
 
+    // もし過去の月のデータなら逐次集計を走らせる
+    await syncIfPastMonth(data.date);
+
     return {
       id: newRow.rowNumber.toString(),
       ...data,
@@ -95,6 +104,8 @@ export async function updateTransaction(
       throw new Error(`ID: ${id} のデータが見つかりません`);
     }
 
+    const oldDate = rowToUpdate.get('日付') || '';
+
     rowToUpdate.set('日付', data.date);
     rowToUpdate.set('カテゴリ', data.category);
     rowToUpdate.set('内容', data.content);
@@ -102,6 +113,16 @@ export async function updateTransaction(
     rowToUpdate.set('メモ', data.memo || '');
 
     await rowToUpdate.save();
+
+    // 更新により月が変わる可能性があるため、新旧両方で必要に応じて集計を更新
+    const oldYearMonth = oldDate.substring(0, 7);
+    const newYearMonth = data.date.substring(0, 7);
+    
+    await syncIfPastMonth(data.date);
+    if (oldYearMonth !== newYearMonth) {
+      await syncIfPastMonth(oldDate);
+    }
+
     return true;
   } catch (error) {
     console.error('Failed to update transaction:', error);
@@ -127,7 +148,13 @@ export async function deleteTransaction(id: string): Promise<boolean> {
       throw new Error(`ID: ${id} のデータが見つかりません`);
     }
 
+    const deletedDate = rowToDelete.get('日付') || '';
+
     await rowToDelete.delete();
+    
+    // 過去の月なら再集計
+    await syncIfPastMonth(deletedDate);
+
     return true;
   } catch (error) {
     console.error('Failed to delete transaction:', error);
