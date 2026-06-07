@@ -61,8 +61,7 @@ export async function syncMonthlySummary(targetYearMonth: string): Promise<void>
       categoryTotals[t.category] += t.amount;
     }
 
-    const doc = await getGoogleSheetDocument();
-    
+
     // 月別集計シートを取得、なければ作成
     let summarySheet = doc.sheetsByTitle[SUMMARY_SHEET_TITLE];
     if (!summarySheet) {
