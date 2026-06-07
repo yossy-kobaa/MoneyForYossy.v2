@@ -119,7 +119,7 @@ export async function syncMonthlySummary(targetYearMonth: string): Promise<void>
       await existingRow.save();
     } else {
       // add
-      await summarySheet.addRow(rowData);
+      await summarySheet.addRow(rowData, { insert: true });
     }
 
   } catch (error) {
